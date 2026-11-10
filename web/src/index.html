@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Конвертер смет ГРАНД-Сметы в CSV: загрузка GSFX и XML, предпросмотр и экспорт в браузере.">
+  <meta name="theme-color" content="#16352c">
+  <title>Смета → CSV · Конвертер файлов</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<svg class="icon-sprite" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 15v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5M9 13h6m-6 4h6"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v13m-5-5 5 5 5-5M4 17v4h16v-4"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><path d="M6 10h12v11H6zM8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></symbol>
+  <symbol id="i-table" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10M15 10v10"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+</defs></svg>
+<aside class="sidebar">
+  <a class="brand" href="#converter" aria-label="Смета CSV — конвертер"><span class="brand-mark">С<span>↗</span></span><span>смета<span class="brand-csv">csv</span></span></a>
+  <p class="side-caption">ИНСТРУМЕНТЫ ДЛЯ СМЕТ</p>
+  <nav aria-label="Основная навигация">
+    <a class="nav-item active" href="#converter"><svg><use href="#i-table"/></svg>Конвертер<span class="nav-dot"></span></a>
+    <a class="nav-item" href="#how"><svg><use href="#i-arrow"/></svg>Как это работает</a>
+    <a class="nav-item" href="#formats"><svg><use href="#i-file"/></svg>Форматы файлов</a>
+  </nav>
+  <div class="side-bottom"><div class="side-local"><svg><use href="#i-lock"/></svg><span>Локальная обработка<small>Файлы остаются у вас</small></span></div><a href="https://github.com/edpik/grand-agent-parser" target="_blank" rel="noopener">Исходный код <span>↗</span></a><small>Конвертер 0.2.0</small></div>
+</aside>
+<div class="workspace">
+  <header class="topbar"><div class="breadcrumb">Инструменты <span>/</span> <strong>Конвертер файлов</strong></div><span class="privacy-pill"><span></span>Без отправки файлов на сервер</span></header>
+  <main id="converter">
+    <section class="intro"><div><p class="eyebrow"><span></span>ГРАНД-СМЕТА → CSV</p><h1>Из сметы — в таблицу<span>.</span></h1><p class="intro-copy">Загрузите документ, проверьте данные и скачайте CSV.<br class="desktop-break">Без установки программ. Прямо на вашем Mac.</p></div><div class="format-art" aria-hidden="true"><div class="art-file">GSFX<svg><use href="#i-file"/></svg></div><svg class="art-arrow"><use href="#i-arrow"/></svg><div class="art-file art-csv">CSV<svg><use href="#i-table"/></svg></div></div></section>
+    <div class="step-line" aria-label="Этапы конвертации"><span class="step-current"><b>1</b> Загрузите файлы</span><i></i><span><b>2</b> Проверьте таблицу</span><i></i><span><b>3</b> Скачайте CSV</span></div>
+    <div class="converter-grid">
+      <section class="panel upload-panel" aria-labelledby="upload-title"><div class="panel-title"><h2 id="upload-title">Исходные файлы</h2><span id="file-counter" class="subtle-tag">0 файлов</span></div>
+        <div id="dropzone" class="dropzone"><div class="upload-icon"><svg><use href="#i-upload"/></svg></div><h3>Перетащите файлы сюда</h3><p>или выберите их на компьютере</p><button id="choose-files" class="button button-primary" type="button">Выбрать файлы <svg><use href="#i-upload"/></svg></button><small>GSF, GSFX, XML · до 50 МБ на файл</small><input id="file-input" type="file" multiple accept=".gsf,.gsfx,.xml" class="visually-hidden" aria-label="Выбрать файлы GSF, GSFX или XML"></div>
+        <div id="queue" class="queue" aria-live="polite"></div>
+        <div class="upload-actions"><button id="convert" class="button button-dark" type="button" disabled>Преобразовать <svg><use href="#i-arrow"/></svg></button><button id="demo" class="text-button" type="button">Попробовать на примере <span>↗</span></button><button id="clear" class="text-button clear-button" type="button" hidden>Очистить</button></div>
+        <p class="compatibility-note"><svg><use href="#i-info"/></svg><span>GSFX с открытым Data.xml конвертируется сразу. Для старого двоичного GSF потребуется XML-экспорт. <a href="#formats">Подробнее</a></span></p>
+      </section>
+      <section class="panel settings-panel" aria-labelledby="settings-title"><div class="panel-title"><h2 id="settings-title">Настройки CSV</h2><svg class="settings-decoration"><use href="#i-table"/></svg></div>
+        <label class="field-label" for="dataset">Что выгрузить</label><select id="dataset"><option value="positions">Позиции сметы</option><option value="fields">Все XML-поля</option></select><p id="dataset-help" class="field-help">Коды, работы, объёмы и значения из сметы.</p>
+        <div class="settings-two"><div><label class="field-label" for="delimiter">Разделитель</label><select id="delimiter"><option value=";">Точка с запятой ;</option><option value=",">Запятая ,</option><option value="tab">Табуляция</option></select></div><div><label class="field-label" for="encoding">Кодировка</label><select id="encoding"><option value="bom">UTF-8 + BOM</option><option value="utf8">UTF-8</option></select></div></div>
+        <label class="check-label"><input id="extras" type="checkbox" checked><span>Исходные поля позиции<small>Дополнительные XML-атрибуты в отдельных столбцах</small></span></label>
+        <label class="check-label"><input id="protect" type="checkbox" checked><span>Защита формул Excel<small>Апостроф перед текстом, который Excel может принять за формулу</small></span></label>
+        <div class="excel-note"><svg><use href="#i-check"/></svg><p>Для Excel и Numbers<small>UTF-8 с BOM корректно сохраняет кириллицу.</small></p></div>
+      </section>
+    </div>
+    <div id="status" class="status-banner" role="status" aria-live="polite" hidden></div>
+    <section class="panel result-panel" aria-labelledby="result-title"><div class="result-heading"><div><div class="result-title-line"><h2 id="result-title">Предпросмотр</h2><span id="row-count" class="subtle-tag">Нет данных</span></div><p id="result-description">Таблица появится после преобразования файлов.</p></div><button id="download" class="button button-primary" type="button" disabled><svg><use href="#i-download"/></svg>Скачать CSV</button></div>
+      <div id="table-tools" class="table-tools" hidden><label class="search-box"><svg><use href="#i-search"/></svg><input id="search" type="search" placeholder="Найти код или наименование…" aria-label="Поиск по данным"></label><select id="file-filter" aria-label="Файл для предпросмотра и экспорта"><option value="all">Все преобразованные файлы</option></select><span id="filter-hint">Фильтр применяется и к CSV</span></div>
+      <div id="empty-result" class="empty-result"><div class="empty-table-art" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div><h3>Всё готово к вашим данным</h3><p>Выберите файлы выше или попробуйте конвертер<br>на небольшом примере сметы.</p></div>
+      <div id="table-wrap" class="table-wrap" hidden><table><thead id="table-head"></thead><tbody id="table-body"></tbody></table></div>
+      <div id="table-footer" class="table-footer" hidden><span id="page-info"></span><div><button id="prev-page" class="icon-button" type="button" aria-label="Предыдущая страница"><svg class="rotate"><use href="#i-chevron"/></svg></button><span id="page-label"></span><button id="next-page" class="icon-button" type="button" aria-label="Следующая страница"><svg><use href="#i-chevron"/></svg></button></div></div>
+    </section>
+    <section id="how" class="how-section"><div><p class="eyebrow">ТРИ ПРОСТЫХ ШАГА</p><h2>Данные без лишних действий</h2></div><div class="how-cards"><article><span>01</span><h3>Добавьте документ</h3><p>Один файл или несколько смет.<br>Обработка идёт на вашем устройстве.</p></article><article><span>02</span><h3>Посмотрите результат</h3><p>Проверьте позиции, выберите нужный<br>файл и настройте состав CSV.</p></article><article><span>03</span><h3>Скачайте таблицу</h3><p>Откройте CSV в Excel, Numbers<br>или используйте его в ИИ-агенте.</p></article></div></section>
+    <section id="formats" class="formats-section"><div><p class="eyebrow">СОВМЕСТИМОСТЬ</p><h2>Какой файл можно преобразовать?</h2></div><div class="format-list"><details open><summary><span class="extension">.gsfx</span><span>Смета с открытым Data.xml</span><span class="support-tag">Поддерживается</span></summary><p>Конвертер читает позиции локальной сметы и сохраняет исходные значения. Если внутри находится Data.xml.crypt или архив защищён паролем, экспортируйте документ в обычный XML из ГРАНД-Сметы.</p></details><details><summary><span class="extension">.gsf</span><span>Документ старого формата</span><span class="support-tag conditional">Зависит от содержимого</span></summary><p>Файл с читаемым XML или ZIP с Data.xml можно обработать. Старый двоичный GSF сначала нужно преобразовать в XML через ГРАНД-Смету или утилиту Repair на Windows. Переименование расширения не меняет формат. <a href="https://66.grandsmeta.ru/upload/iblock/cff/WorkWithXML6.pdf" target="_blank" rel="noopener">Инструкция издателя ↗</a></p></details><details><summary><span class="extension">.xml</span><span>XML-экспорт документа</span><span class="support-tag">Поддерживается</span></summary><p>Для локальной сметы доступна выгрузка позиций. Другие структуры можно сохранить в режиме «Все XML-поля». Сохранённые формулы не вычисляются, отсутствующие значения не заменяются нулями. Для кодов с ведущими нулями при импорте CSV в Excel выберите тип столбца «Текст».</p></details></div></section>
+    <footer class="footer"><span>Смета → CSV <span class="footer-divider">/</span> v0.2.0</span><span>Конвертация сохраняет данные из файла и не проверяет сметный расчёт.</span><a href="https://github.com/edpik/grand-agent-parser" target="_blank" rel="noopener">GitHub ↗</a></footer>
+  </main>
+</div>
+<noscript><div class="noscript">Для обработки файлов включите JavaScript в браузере.</div></noscript>
+<script type="module" src="./app.js"></script>
+</body>
+</html>

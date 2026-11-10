@@ -6,7 +6,7 @@ on:
       tag:
         description: Existing release tag
         required: true
-        default: v0.1.0
+        default: v0.2.0
 
 permissions:
   contents: write
@@ -29,6 +29,18 @@ jobs:
           python-version: '3.13'
       - name: Test the tagged source
         run: python -m unittest discover -s tests -v
+      - uses: actions/setup-node@v4
+        if: hashFiles('web/package-lock.json') != ''
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Test and build browser converter
+        if: hashFiles('web/package-lock.json') != ''
+        run: |
+          npm ci --prefix web --no-audit --no-fund
+          npm test --prefix web
+          npm run build --prefix web
       - name: Package and publish ZIP
         shell: bash
         run: |
@@ -36,13 +48,27 @@ jobs:
           [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
           git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}"
           ASSET_NAME="grand_agent_parser_${RELEASE_TAG#v}.zip"
-          git archive --format=zip --prefix=grand_agent_parser/ "$RELEASE_TAG" -o "$ASSET_NAME"
+          PACKAGE_ROOT="$RUNNER_TEMP/parser-package/grand_agent_parser"
+          mkdir -p "$PACKAGE_ROOT"
+          git archive --format=tar "$RELEASE_TAG" | tar -xf - -C "$PACKAGE_ROOT"
+          if [[ -d web/dist ]]; then
+            cp -R web/dist "$PACKAGE_ROOT/web/dist"
+          fi
+          python - "$PACKAGE_ROOT" "$ASSET_NAME" <<'PY'
+          from pathlib import Path
+          import sys, zipfile
+          root = Path(sys.argv[1])
+          with zipfile.ZipFile(sys.argv[2], 'w', zipfile.ZIP_DEFLATED) as archive:
+              for item in sorted(root.rglob('*')):
+                  if item.is_file():
+                      archive.write(item, 'grand_agent_parser/' + str(item.relative_to(root)))
+          PY
           python -c 'import sys, zipfile; assert zipfile.ZipFile(sys.argv[1]).testzip() is None' "$ASSET_NAME"
           cp CHANGELOG.md "$RUNNER_TEMP/release-notes.md"
           printf '\n\nSHA-256 ZIP:\n```text\n' >> "$RUNNER_TEMP/release-notes.md"
           sha256sum "$ASSET_NAME" >> "$RUNNER_TEMP/release-notes.md"
           printf '```\n' >> "$RUNNER_TEMP/release-notes.md"
           gh release create "$RELEASE_TAG" "$ASSET_NAME" --verify-tag \
-            --title "$RELEASE_TAG — парсер GSDX, GSFX и XML ФСНБ" \
+            --title "$RELEASE_TAG — парсер и веб-конвертер CSV" \
             --notes-file "$RUNNER_TEMP/release-notes.md"
           gh release view "$RELEASE_TAG" --json url --jq '.url' >> "$GITHUB_STEP_SUMMARY"
