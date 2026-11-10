@@ -1,0 +1,82 @@
+{
+  "gsdx_sources": [
+    {
+      "source_id": "sha256:d5a023b882b32308c33383ed08cf6148f8126a422841816586d6c02987e4ea90",
+      "base": {
+        "Caption": "Кемеровская область (редакция 2014г)",
+        "Publisher": "Territorial",
+        "ID": "105420",
+        "District": "Сибирский федеральный округ",
+        "DistrictSign": "СФО",
+        "OpenMask": "05420",
+        "BaseYear": "2001",
+        "ShowRootInGs": "Yes"
+      },
+      "status": "partial",
+      "catalog_documents": 134,
+      "readable_articles": 132,
+      "pages": 1169,
+      "chunks": 2708,
+      "gsh_payloads": 134,
+      "uninterpreted_blocks": 284
+    },
+    {
+      "source_id": "sha256:9f19d69c163e4512dcdaab01be544ce393fe1a0ec0e9f25139a4c4c3516973fc",
+      "base": {
+        "Caption": "Кемеровская область (редакция 2014г - И1)",
+        "Publisher": "Territorial",
+        "ID": "105421",
+        "District": "Сибирский федеральный округ",
+        "DistrictSign": "СФО",
+        "OpenMask": "05421",
+        "BaseYear": "2001",
+        "ShowRootInGs": "Yes"
+      },
+      "status": "partial",
+      "catalog_documents": 137,
+      "readable_articles": 135,
+      "pages": 1208,
+      "chunks": 2806,
+      "gsh_payloads": 137,
+      "uninterpreted_blocks": 290
+    },
+    {
+      "source_id": "sha256:706097c24273b264d955f0e64e4da68672d474b06475149422b8f53885bb5535",
+      "base": {
+        "Caption": "ФСНБ-2022 (с Изм. 1-19)",
+        "Publisher": "Federal",
+        "ID": "121019",
+        "District": "Федеральные базы",
+        "DistrictSign": "ФБ",
+        "OpenMask": "121019",
+        "BaseYear": "2001",
+        "ShowRootInGs": "Yes",
+        "HasBase2022Fields": "Yes",
+        "BasePriceDate": "01.01.2022"
+      },
+      "status": "partial",
+      "catalog_documents": 125,
+      "readable_articles": 125,
+      "pages": 855,
+      "chunks": 1872,
+      "gsh_payloads": 125,
+      "uninterpreted_blocks": 268
+    }
+  ],
+  "gsdx_counts": {
+    "documents": 396,
+    "outlines": 390,
+    "article_metadata": 392,
+    "pages": 3232,
+    "chunks": 7386,
+    "blocks": 1630
+  },
+  "fsnb_counts": {
+    "documents": 7,
+    "norms": 56242,
+    "norm_resources": 547052,
+    "catalog_resources": 47576
+  },
+  "approved_for_calculation": false,
+  "note": "GSDX numeric binary payloads are not decoded. FSNB records come from separate official open XML."
+}

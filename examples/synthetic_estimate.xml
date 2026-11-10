@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Document Generator="Synthetic test fixture, not a real estimate"
+          ProgramVersion="0.1"
+          DocumentType="{2B0470FD-477C-4359-9F34-EEBE36B7D340}">
+  <Chapters>
+    <Chapter SysID="C1" Caption="Искусственный пример для проверки парсера">
+      <Position SysID="P1" Number="1" Code="TEST-001" Caption="Условная работа"
+                Units="100 м2" Quantity="250/100" PriceLevel="2001">
+        <Quantity Fx="250/100" Result="2.500000" Precision="6"/>
+      </Position>
+      <Position SysID="P2" Number="2" Code="TEST-001" Caption="Повторное вхождение кода"
+                Units="100 м2" Quantity="unknown_formula" PriceLevel="2001"/>
+    </Chapter>
+  </Chapters>
+</Document>

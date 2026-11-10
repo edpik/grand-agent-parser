@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "grand-agent-parser"
+version = "0.1.0"
+description = "Conservative GSDX, GSFX and open FSNB XML extraction for AI agents"
+requires-python = ">=3.10"
+
+[project.scripts]
+grand-parser = "grand_parser.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["grand_parser*"]
+
