@@ -8,7 +8,7 @@ await build({ entryPoints: ['src/app.js', 'src/converter.worker.js'], bundle: tr
 for (const name of ['index.html', 'style.css']) await copyFile('src/' + name, 'dist/' + name);
 await copyFile('../examples/synthetic_estimate.gsfx', 'dist/examples/synthetic_estimate.gsfx');
 const notices = [];
-for (const name of ['fflate', 'saxes', 'xmlchars']) {
+for (const name of ['fflate', 'saxes', 'xmlchars', 'pako', 'htmlparser2', 'domelementtype', 'domhandler', 'domutils', 'dom-serializer', 'entities', 'dom-serializer/node_modules/entities']) {
   const metadata = JSON.parse(await readFile(`node_modules/${name}/package.json`, 'utf8'));
   let license;
   for (const candidate of ['LICENSE', 'LICENSE.md', 'LICENSE.txt']) {
@@ -16,7 +16,7 @@ for (const name of ['fflate', 'saxes', 'xmlchars']) {
   }
   if (!license && name === 'saxes') license = await readFile('licenses/saxes-LICENSE', 'utf8');
   if (!license) throw new Error(`Missing license for ${name}`);
-  notices.push(`${name} ${metadata.version}\n${license}`);
+  notices.push(`${metadata.name} ${metadata.version}\n${license}`);
 }
 await writeFile('dist/THIRD_PARTY_NOTICES.txt', notices.join('\n\n------\n\n'));
 console.log('Static converter built: dist/');

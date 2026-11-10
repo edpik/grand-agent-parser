@@ -1,6 +1,6 @@
 {
   "name": "grand-csv-web",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "fflate": "0.8.2",
+    "htmlparser2": "10.0.0",
+    "pako": "2.1.0",
     "saxes": "6.0.0"
   },
   "devDependencies": {

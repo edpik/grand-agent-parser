@@ -1,13 +1,13 @@
 import { unzipSync } from 'fflate';
 import { SaxesParser } from 'saxes';
+import { ConversionError } from './errors.js';
+import { convertGsdx } from './gsdx.js';
+export { ConversionError } from './errors.js';
 
-export const LIMITS = Object.freeze({ file: 50 * 1024 * 1024, xml: 64 * 1024 * 1024,
+export const LIMITS = Object.freeze({ file: 256 * 1024 * 1024, total: 512 * 1024 * 1024, xml: 64 * 1024 * 1024,
   entries: 10000, nodes: 500000, fields: 400000, positions: 100000, depth: 128 });
 const LS_TYPE = '2B0470FD-477C-4359-9F34-EEBE36B7D340';
 
-export class ConversionError extends Error {
-  constructor(code, message) { super(message); this.code = code; this.name = 'ConversionError'; }
-}
 const fail = (code, message) => { throw new ConversionError(code, message); };
 const u16 = (d, p) => d.getUint16(p, true);
 const u32 = (d, p) => d.getUint32(p, true);
@@ -61,7 +61,7 @@ export function crc32(bytes) {
 }
 
 export function extractXml(bytes, limits = LIMITS) {
-  if (bytes.length > limits.file) fail('file_limit', 'Файл больше 50 МБ. Разделите документ или загрузите XML-экспорт меньшего размера.');
+  if (bytes.length > limits.file) fail('file_limit', 'Файл больше 256 МиБ. Разделите документ или загрузите XML-экспорт меньшего размера.');
   if (bytes[0] === 0x50 && bytes[1] === 0x4b) {
     const entries = zipDirectory(bytes, limits);
     const plain = entries.filter(e => e.normalized.split('/').at(-1).toLowerCase() === 'data.xml');
@@ -126,7 +126,7 @@ export function literal(value) {
 
 export function parseXml(text, limits = LIMITS) {
   const parser = new SaxesParser({ xmlns: true });
-  const stack = [], positions = [], fields = [], warnings = [];
+  const stack = [], positions = [], fields = [], warnings = [], elements = [];
   let root = null, nodes = 0, captured = null;
   const addField = row => { if (fields.length >= limits.fields) fail('field_limit', 'В документе больше 400 000 XML-полей. Разделите его на несколько файлов.'); fields.push(row); };
   parser.on('doctype', () => fail('dtd', 'DTD и объявления сущностей не поддерживаются.'));
@@ -136,6 +136,7 @@ export function parseXml(text, limits = LIMITS) {
     const parent = stack.at(-1), ordinal = parent ? (parent.counts[node.name] = (parent.counts[node.name] || 0) + 1) : 1;
     const path = (parent?.path || '') + `/${node.name}[${ordinal}]`;
     const attrs = Object.fromEntries(Object.values(node.attributes).map(a => [a.name, a.value]));
+    if (node.local === 'Document') elements.push({ local: node.local, path });
     if (!root) root = { name: node.local, attributes: attrs };
     const entry = { name: node.name, local: node.local, path, attrs, counts: Object.create(null), text: '', ordinal };
     const isPosition = node.local === 'Position' && stack.length === 3 &&
@@ -187,16 +188,23 @@ export function parseXml(text, limits = LIMITS) {
   if (!positions.length) warnings.push('Позиции локальной сметы не найдены. Можно выгрузить доступные данные в режиме «Все XML-поля».');
   const unresolved = positions.filter(p => !p.quantity && p.formula).length;
   if (unresolved) warnings.push(`У ${unresolved} поз. нет сохранённого числового объёма. Формулы сохранены отдельно и не вычислялись.`);
-  return { positions, fields, warnings, root: root.name, documentType: root.attributes.DocumentType || '', nodes };
+  return { positions, fields, warnings, root: root.name, documentType: root.attributes.DocumentType || '', nodes, elements };
 }
 
 export async function convert(bytes, name, limits = LIMITS) {
   const input = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-  const unpacked = extractXml(input, limits), decoded = decodeXml(unpacked.bytes);
-  const result = parseXml(decoded.text, limits);
+  if (input.length > limits.file) fail('file_limit', 'Файл больше 256 МиБ.');
+  let result;
+  if (input[0] === 83 && input[1] === 68 && input[2] === 66 || /\.gsdx$/i.test(name)) {
+    result = convertGsdx(input, limits, { parseXml, decodeXml });
+  } else {
+    const unpacked = extractXml(input, limits), decoded = decodeXml(unpacked.bytes);
+    result = { ...parseXml(decoded.text, limits), container: unpacked.kind, member: unpacked.member,
+      encoding: decoded.encoding };
+  }
   const digest = await crypto.subtle.digest('SHA-256', input);
-  return { ...result, name, bytes: input.length, container: unpacked.kind, member: unpacked.member,
-    encoding: decoded.encoding, sha256: [...new Uint8Array(digest)].map(x => x.toString(16).padStart(2, '0')).join(''),
+  return { ...result, name, bytes: input.length,
+    sha256: [...new Uint8Array(digest)].map(x => x.toString(16).padStart(2, '0')).join(''),
     formulaEvaluated: false };
 }
 
@@ -205,16 +213,29 @@ export const POSITION_COLUMNS = [
   ['unit', 'Ед. изм.'], ['quantity', 'Количество'], ['formula', 'Формула количества'], ['priceLevel', 'Уровень цен'],
   ['basePZ', 'ПЗ, базисные'], ['baseOZ', 'Оплата труда, базисная'], ['baseEM', 'Эксплуатация машин, базисная'],
   ['baseZM', 'Оплата машинистов, базисная'], ['baseMT', 'Материалы, базисные'], ['currentPZ', 'ПЗ, текущие'], ['systemId', 'ID позиции'],
-  ['path', 'XML-путь'], ['sourceHash', 'SHA-256 файла']
+  ['path', 'Путь в источнике'], ['sourceHash', 'SHA-256 файла']
 ];
-export const FIELD_COLUMNS = [['file', 'Файл'], ['path', 'XML-путь'], ['kind', 'Тип'], ['key', 'Поле'], ['value', 'Значение'], ['sourceHash', 'SHA-256 файла']];
+export const FIELD_COLUMNS = [['file', 'Файл'], ['path', 'Путь в источнике'], ['kind', 'Тип'], ['key', 'Поле'], ['value', 'Значение'], ['sourceHash', 'SHA-256 файла']];
+
+const GSDX_COMMON = [['file', 'Файл'], ['folders', 'Папки каталога'], ['documentId', 'ID документа'],
+  ['code', 'Обозначение'], ['name', 'Наименование']];
+const GSDX_PROVENANCE = [['path', 'Путь в источнике'], ['numericStatus', 'Извлечение числовых данных'],
+  ['approved', 'Допущено к расчётам'], ['sourceHash', 'SHA-256 файла']];
+export const DATASET_COLUMNS = {
+  catalog: [...GSDX_COMMON, ['articleAvailable', 'Техническая часть доступна'], ...GSDX_PROVENANCE],
+  pages: [...GSDX_COMMON, ['page', 'Страница'], ['text', 'Текст'], ['encoding', 'Кодировка страницы'],
+    ['block', 'Блок'], ['decodedOffset', 'Смещение в распакованном блоке'], ['decodedLength', 'Байт HTML'],
+    ['assets', 'Вложений'], ['trailerBytes', 'Неразобранных байт в конце статьи'], ...GSDX_PROVENANCE],
+  blocks: [['file', 'Файл'], ['block', 'Блок'], ['offset', 'Смещение в файле'], ['length', 'Байт'],
+    ['status', 'Статус разбора'], ['signature', 'Сигнатура HEX'], ...GSDX_PROVENANCE]
+};
 
 export function rowsFor(results, mode = 'positions', extras = true) {
-  const columns = mode === 'fields' ? [...FIELD_COLUMNS] : [...POSITION_COLUMNS];
+  const columns = [...(DATASET_COLUMNS[mode] || (mode === 'fields' ? FIELD_COLUMNS : POSITION_COLUMNS))];
   const rows = [], keys = new Set(columns.map(c => c[0]));
-  for (const result of results) for (const source of mode === 'fields' ? result.fields : result.positions) {
+  for (const result of results) for (const source of (mode === 'positions' ? result.positions : result[mode]) || []) {
     const row = { ...source, file: result.name, sourceHash: result.sha256 || '' };
-    if (mode !== 'fields' && extras) for (const [key, value] of Object.entries(source.raw)) {
+    if (mode === 'positions' && extras) for (const [key, value] of Object.entries(source.raw)) {
       const field = 'xml:' + key;
       row[field] = value;
       if (!keys.has(field)) { keys.add(field); columns.push([field, 'XML: ' + key]); }

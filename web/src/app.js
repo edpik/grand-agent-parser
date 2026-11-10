@@ -1,4 +1,4 @@
-import { rowsFor, filterRows, makeCsv } from './converter.js';
+import { rowsFor, filterRows, makeCsv, LIMITS } from './converter.js';
 
 const $ = id => document.getElementById(id);
 const ui = Object.fromEntries(['file-input', 'dropzone', 'choose-files', 'queue', 'file-counter', 'convert', 'demo',
@@ -43,11 +43,11 @@ function renderQueue() {
   for (const item of files) {
     const row = el('div', 'file-row'), mark = el('div', 'file-type'); mark.append(icon('file'));
     const info = el('div'); info.append(el('div', 'file-name', item.file.name));
-    const meta = item.result ? `${size(item.file.size)} · ${count(item.result.positions.length)} поз. · ${item.result.encoding.toUpperCase()}${item.demo ? ' · демонстрация' : ''}` : size(item.file.size);
+    const meta = item.result?.container === 'GSDX / SDB5' ? `${size(item.file.size)} · ${count(item.result.catalog.length)} сборников · ${count(item.result.pages.length)} страниц` : item.result ? `${size(item.file.size)} · ${count(item.result.positions.length)} поз. · ${item.result.encoding.toUpperCase()}${item.demo ? ' · демонстрация' : ''}` : size(item.file.size);
     info.append(el('div', 'file-meta', meta));
     if (item.error) info.append(el('div', 'file-error', item.error));
     if (item.result?.warnings.length) info.append(el('div', 'file-warning', item.result.warnings.join(' ')));
-    const labels = { pending: 'Ожидает', running: 'Обработка…', success: item.result?.positions.length ? 'Готово' : 'XML-поля', error: 'Не прочитан' };
+    const labels = { pending: 'Ожидает', running: 'Обработка…', success: item.result?.catalog ? 'Частично' : item.result?.positions.length ? 'Готово' : 'XML-поля', error: 'Не прочитан' };
     const badge = el('span', 'file-badge ' + item.status, labels[item.status]);
     const remove = el('button', 'remove-file'); remove.type = 'button'; remove.setAttribute('aria-label', `Убрать файл ${item.file.name}`);
     remove.disabled = busy; remove.append(icon('close')); remove.addEventListener('click', () => {
@@ -73,8 +73,8 @@ function renderResult() {
   const selected = ui['file-filter'].value;
   const results = files.filter(f => f.result && (selected === 'all' || String(f.id) === selected)).map(f => f.result);
   const mode = ui.dataset.value;
-  ui.extras.disabled = mode === 'fields';
-  ui['dataset-help'].textContent = mode === 'fields' ? 'Каждый атрибут и текстовый узел — отдельная строка с XML-путём.' : 'Коды, работы, объёмы и значения из сметы.';
+  ui.extras.disabled = mode !== 'positions';
+  ui['dataset-help'].textContent = { positions: 'Коды, работы, объёмы и значения из сметы.', fields: 'Атрибуты и текстовые узлы XML; для GSDX — каталог, зоны и структура статей.', catalog: 'Сборники нормативной базы GSDX. Числовые расценки не извлекаются.', pages: 'Технические тексты GSDX: одна страница на строку, со ссылкой на источник.', blocks: 'Блоки GSDX, их смещения и статус: decoded / uninterpreted.' }[mode];
   ui.search.placeholder = mode === 'fields' ? 'Найти XML-путь, поле или значение…' : 'Найти код или наименование…';
   const dataKey = JSON.stringify([mode, ui.extras.checked, selected, results.map(r => [r.sha256, r.name])]);
   if (dataKey !== cachedDataKey) { cachedDataKey = dataKey; cachedData = rowsFor(results, mode, ui.extras.checked); cachedFilterKey = ''; }
@@ -89,17 +89,17 @@ function renderResult() {
   ui['table-footer'].hidden = !hasData; ui['empty-result'].hidden = hasData;
   const emptyTitle = ui['empty-result'].querySelector('h3'), emptyCopy = ui['empty-result'].querySelector('p');
   emptyTitle.textContent = results.length ? (data.rows.length ? 'Ничего не найдено' : 'В этом режиме нет строк') : 'Всё готово к вашим данным';
-  emptyCopy.textContent = results.length ? (data.rows.length ? 'Измените поисковый запрос или выберите другой файл.' : 'Выберите «Все XML-поля», чтобы увидеть доступные данные документа.') : 'Выберите файлы выше или попробуйте конвертер на небольшом примере сметы.';
+  emptyCopy.textContent = results.length ? (data.rows.length ? 'Измените поисковый запрос или выберите другой файл.' : 'Для GSDX выберите каталог или технические тексты; для XML — «Все XML-поля». Другие типы файлов в выбранный режим не включаются.') : 'Выберите файлы выше или попробуйте конвертер на небольшом примере сметы.';
   ui['row-count'].textContent = results.length ? `${count(view.rows.length)} строк` : 'Нет данных';
   ui['result-description'].textContent = results.length ? `${count(results.length)} файл(а) · ${count(view.columns.length)} столбцов в CSV · значения без пересчёта` : 'Таблица появится после преобразования файлов.';
-  const display = mode === 'fields' ? view.columns : view.columns.filter(([key]) => ['file', 'chapter', 'number', 'code', 'name', 'unit', 'quantity', 'formula', 'basePZ', 'currentPZ'].includes(key));
+  const display = mode !== 'positions' ? view.columns : view.columns.filter(([key]) => ['file', 'chapter', 'number', 'code', 'name', 'unit', 'quantity', 'formula', 'basePZ', 'currentPZ'].includes(key));
   ui['table-head'].replaceChildren(); ui['table-body'].replaceChildren();
   if (!hasData) return;
   const head = el('tr'); for (const [, title] of display) head.append(el('th', '', title)); ui['table-head'].append(head);
   const start = page * PAGE_SIZE;
   for (const row of view.rows.slice(start, start + PAGE_SIZE)) {
     const tr = el('tr');
-    for (const [key] of display) { const value = String(row[key] ?? ''); const td = el('td', ['name', 'value'].includes(key) ? 'wide-cell' : '', value || '—'); td.title = value; tr.append(td); }
+    for (const [key] of display) { const value = String(row[key] ?? ''); const td = el('td', ['name', 'value', 'text'].includes(key) ? 'wide-cell' : '', value || '—'); td.title = value; tr.append(td); }
     ui['table-body'].append(tr);
   }
   ui['page-info'].textContent = `Строки ${count(start + 1)}–${count(Math.min(start + PAGE_SIZE, view.rows.length))} из ${count(view.rows.length)}. CSV содержит все отфильтрованные строки.`;
@@ -110,11 +110,11 @@ function renderResult() {
 function addFiles(incoming, demo = false) {
   const added = [], problems = [];
   for (const file of incoming) {
-    if (!/\.(gsf|gsfx|xml)$/i.test(file.name)) { problems.push(`${file.name}: выберите GSF, GSFX или XML.`); continue; }
-    if (file.size > 50 * 1024 * 1024) { problems.push(`${file.name}: файл больше 50 МБ.`); continue; }
+    if (!/\.(gsf|gsfx|gsdx|xml)$/i.test(file.name)) { problems.push(`${file.name}: выберите GSF, GSFX, GSDX или XML.`); continue; }
+    if (file.size > LIMITS.file) { problems.push(`${file.name}: файл больше 256 МиБ.`); continue; }
     if (!file.size) { problems.push(`${file.name}: файл пуст.`); continue; }
     if (files.length >= 10) { problems.push('Можно добавить не больше 10 файлов за один раз.'); break; }
-    if (files.reduce((sum, f) => sum + f.file.size, 0) + file.size > 100 * 1024 * 1024) { problems.push('Общий размер файлов ограничен 100 МБ. Уберите часть файлов.'); break; }
+    if (files.reduce((sum, f) => sum + f.file.size, 0) + file.size > LIMITS.total) { problems.push('Общий размер файлов ограничен 512 МиБ. Уберите часть файлов.'); break; }
     if (files.some(f => f.file.name === file.name && f.file.size === file.size && f.file.lastModified === file.lastModified)) continue;
     const item = { id: nextId++, file, demo, status: 'pending', result: null, error: null };
     files.push(item); added.push(item.id);
@@ -139,7 +139,9 @@ async function processQueue(onlyIds = null) {
     } catch (error) { item.status = 'error'; item.error = error.message || 'Не удалось прочитать файл.'; }
     renderQueue();
   }
-  busy = false; page = 0; refreshFileFilter(); renderQueue(); renderResult();
+  busy = false; page = 0; refreshFileFilter();
+  if (!files.some(f => f.result?.positions.length) && files.some(f => f.result?.catalog) && ui.dataset.value === 'positions') ui.dataset.value = 'catalog';
+  renderQueue(); renderResult();
   const noPositions = files.some(f => f.result) && !files.some(f => f.result?.positions.length);
   if (noPositions && ui.dataset.value === 'positions') message('Файлы прочитаны, но позиции локальной сметы не найдены. Можно выгрузить исходные XML-поля.', 'warning', { label: 'Показать XML-поля', run: () => { ui.dataset.value = 'fields'; page = 0; renderResult(); message('Выбран режим «Все XML-поля». Можно скачать CSV.'); } });
   else if (successes) message(`Готово: ${successes} из ${pending.length} файл(а). Проверьте таблицу и скачайте CSV.${pending.some(f => f.demo) ? ' Пример содержит искусственные данные.' : ''}`, successes < pending.length ? 'warning' : '');
@@ -183,7 +185,7 @@ ui.download.addEventListener('click', async () => {
     const url = URL.createObjectURL(blob), anchor = document.createElement('a'); anchor.href = url;
     const names = [...new Set(view.rows.map(row => row.file))];
     const stem = names.length === 1 ? names[0].replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]/g, '_') : 'grand_export';
-    anchor.download = stem + (ui.dataset.value === 'fields' ? '_xml_fields' : '') + '.csv';
+    anchor.download = stem + (ui.dataset.value === 'positions' ? '' : '_' + ui.dataset.value) + '.csv';
     document.body.append(anchor); anchor.click(); anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
     message(`CSV подготовлен: ${count(view.rows.length)} строк, ${count(view.columns.length)} столбцов, ${size(blob.size)}.`);
   } catch (error) { message(error.message || 'Не удалось подготовить CSV.', 'error'); }

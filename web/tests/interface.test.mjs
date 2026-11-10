@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { Window } from 'happy-dom';
 import { convert } from '../src/converter.js';
+import { fixture } from './gsdx-fixture.mjs';
 
 test('DOM integration: demo → preview → filters → CSV download; failed GSF and filenames render as text', async () => {
   const window = new Window({ url:'https://converter.test/', settings:{ disableJavaScriptEvaluation:true,
@@ -68,6 +69,19 @@ test('DOM integration: demo → preview → filters → CSV download; failed GSF
     assert.equal($('download').disabled,false,'A failed new file must not remove the successful previous result');
     $('clear').click();
     assert.equal($('queue').children.length,0);assert.equal($('download').disabled,true);
+    inputFiles([new File([fixture()],'Кемерово.gsdx')]);
+    $('convert').click();
+    await wait(()=>$('table-body').textContent.includes('Коррозия'));
+    assert.equal($('dataset').value,'catalog');
+    assert.match($('queue').textContent,/Частично/);
+    assert.match($('queue').textContent,/не декодируются/);
+    $('dataset').value='pages';$('dataset').dispatchEvent(new window.Event('change'));
+    assert.equal($('table-body').children.length,2);
+    assert.match($('table-body').textContent,/Техническая часть/);
+    $('download').click();await wait(()=>downloads.length===2);
+    assert.match(await downloads[1].blob.text(),/unsupported_binary_payload/);
+    assert.match(downloads[1].name,/_pages\.csv$/);
+    $('clear').click();
     inputFiles([new File(['binary'],'<img data-xss="1">.gsfx')]);
     assert.equal(document.querySelector('[data-xss]'),null);
     assert.ok($('queue').textContent.includes('<img data-xss="1">.gsfx'));
