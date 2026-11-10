@@ -1,6 +1,7 @@
 import { Inflate } from 'pako';
 import { Parser } from 'htmlparser2';
 import { ConversionError } from './errors.js';
+import { readGsdxIndex } from './gsdx-index.js';
 
 const fail = message => { throw new ConversionError('gsdx', message); };
 const cp1251 = new TextDecoder('windows-1251', { fatal: true });
@@ -186,12 +187,14 @@ export function convertGsdx(bytes, limits, { parseXml, decodeXml }) {
         trailerBytes: articleData.trailer, path: `${article}:page:${page.page}` });
     }
   }
+  const index = readGsdxIndex(bytes, blocks);
+  for (const name of index.decoded) decoded.add(name);
   const blockRows = blocks.map(b => ({ block: b.name, offset: b.offset, length: b.length,
     path: b.name, status: decoded.has(b.name) ? 'decoded' : 'uninterpreted',
     signature: [...bytes.subarray(b.offset, b.offset + Math.min(12, b.length))].map(x => x.toString(16).padStart(2, '0')).join(''),
     numericStatus: 'unsupported_binary_payload', approved: 'false' }));
-  return { positions: [], fields, catalog, pages, blocks: blockRows, container: 'GSDX / SDB5', member: null,
+  return { positions: [], fields, catalog, pages, records: index.records, indexedDescriptions: index.indexedDescriptions, blocks: blockRows, container: 'GSDX / SDB5', member: null,
     encoding: 'windows-1251 / HTML', root: content.root, documentType: '', nodes: content.nodes,
     numericExtraction: 'unsupported_binary_payload', approvedForCalculation: false,
-    warnings: ['GSDX прочитан частично: доступны каталог, XML-структура и технические тексты. Расценки, нормы расхода и числовые ресурсы из бинарных блоков не декодируются. Тексты предназначены для поиска и ИИ-агента, не для расчёта сметы.'] };
+    warnings: [`Записей из индекса кодов: ${index.records.length}; поисковых текстов: ${index.indexedDescriptions}. Поисковый текст — слова из индекса по порядку, без исходной пунктуации, регистра и пропущенных индексатором слов.`, 'GSDX прочитан частично: доступны каталог, XML-структура и технические тексты. Расценки, нормы расхода и числовые ресурсы из бинарных блоков не декодируются. Тексты предназначены для поиска и ИИ-агента, не для расчёта сметы.'] };
 }

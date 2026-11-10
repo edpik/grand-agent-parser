@@ -38,7 +38,7 @@ class Sink:
         encoded = dumps(record)
         self.db.execute("INSERT INTO records VALUES(?,?,?,?,?,?,?)",
                         (key, kind, source, code, title, text, encoded))
-        if kind in {"chunks", "norms", "catalog_resources", "estimate_positions"}:
+        if kind in {"chunks", "norms", "catalog_resources", "estimate_positions", "base_index_records"}:
             self.db.execute("INSERT INTO search VALUES(?,?,?,?,?)",
                             (key, source, kind, title or "", text or ""))
         if kind not in self.files:

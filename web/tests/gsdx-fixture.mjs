@@ -29,3 +29,24 @@ export function fixture(catalog = '<Region Caption="Кемеровская об�
     '1\\Article2': packed(article([firstHtml, '<html><body><p>Вторая страница</p></body></html>'], { assets: true, trailer: Buffer.from('UNINTERPRETED_TRAILER') })),
     '1\\Data': Buffer.from('GSH\x03UNKNOWN_NUMERIC') });
 }
+
+export function table(records, version = 1) {
+  let offset = 12 + records.length * 4;
+  const offsets = records.map(b => { const o = uint(offset); offset += b.length; return o; });
+  return Buffer.concat([uint(23), uint(version), uint(records.length), ...offsets, ...records]);
+}
+const string = text => { const bytes = Buffer.from(text); return Buffer.concat([uint(bytes.length), bytes]); };
+export function indexedFixture({ missingWord = false, missingRow = false, conflictingPosition = false, fts = true } = {}) {
+  // ASCII words for a portable synthetic fixture. Real CP1251 is tested separately.
+  const blocks = {
+    Content: packed(Buffer.from('<Region><Document Sign="TEST" Caption="Synthetic materials"/></Region>')),
+    DocRows: table([Buffer.from('UNDECODED_ROW_0'), Buffer.from('UNDECODED_ROW_1')]),
+    CodeIndex: table([Buffer.concat([string('TEST-001'), uint(0)]), Buffer.concat([string('TEST-002'), uint(missingRow ? 9 : 1)])])
+  };
+  if (fts) Object.assign(blocks, {
+    FtsWords: table([string('truck'), string('10'), string('tank')]),
+    'Fts2\\Row0': table([Buffer.concat([uint(0), uint(1), uint(0)]), Buffer.concat([uint(missingWord ? 9 : 1), uint(1), uint(conflictingPosition ? 0 : 2)])]),
+    'Fts2\\Row1': table([Buffer.concat([uint(2), uint(1), uint(0)])])
+  });
+  return container(blocks);
+}

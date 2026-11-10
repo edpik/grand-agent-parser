@@ -12,6 +12,7 @@ from pathlib import Path, PurePosixPath
 from . import __version__
 from .binary import FormatError, Gsdx, article_pages
 from .store import Sink
+from .indexio import read_index_records
 from .text import chunks, html_text
 from .xmlio import import_fsnb, import_grand_xml, parse_xml, tag, tree
 
@@ -130,6 +131,18 @@ def ingest_gsdx(path, sink, digest, size, overlap):
                               {**common, "page_id": page_key, "char_start": start, "char_end": end,
                                "text": content, "source_locator": chunk_key}, title=title, text=content)
                     report["chunks"] += 1
+        records, index_blocks, descriptions = read_index_records(reader)
+        decoded.update(index_blocks)
+        report['indexed_records'] = len(records)
+        report['indexed_descriptions'] = descriptions
+        for record in records:
+            codes = ' | '.join(record['codes'])
+            sink.emit('base_index_records', source + ':row:' + str(record['row_index']), source,
+                      record, code=codes, title=codes, text=record['search_text'])
+        if records:
+            report['warnings'].append(
+                'Search text is an ordered token sequence: original case, punctuation and omitted words are unavailable. '
+                'DocRows names/units and GSH article payloads are not decoded.')
         for name, block in reader.blocks.items():
             payload = reader.read(name)
             gsh = payload.startswith(b"GSH")

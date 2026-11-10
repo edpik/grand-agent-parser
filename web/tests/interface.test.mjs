@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { Window } from 'happy-dom';
 import { convert } from '../src/converter.js';
-import { fixture } from './gsdx-fixture.mjs';
+import { fixture, indexedFixture } from './gsdx-fixture.mjs';
 
 test('DOM integration: demo → preview → filters → CSV download; failed GSF and filenames render as text', async () => {
   const window = new Window({ url:'https://converter.test/', settings:{ disableJavaScriptEvaluation:true,
@@ -71,8 +71,12 @@ test('DOM integration: demo → preview → filters → CSV download; failed GSF
     assert.equal($('queue').children.length,0);assert.equal($('download').disabled,true);
     inputFiles([new File([fixture()],'Кемерово.gsdx')]);
     $('convert').click();
-    await wait(()=>$('table-body').textContent.includes('Коррозия'));
-    assert.equal($('dataset').value,'catalog');
+    await wait(()=>$('queue').textContent.includes('Частично') && !$('convert').textContent.includes('Преобразование'));
+    assert.equal($('dataset').value,'records');
+    assert.equal($('download').disabled,true,'A catalog header must not be auto-exported as actual records');
+    assert.match($('status').textContent,/Доступны только метаданные/);
+    $('dataset').value='catalog';$('dataset').dispatchEvent(new window.Event('change'));
+    assert.match($('table-body').textContent,/Коррозия/);
     assert.match($('queue').textContent,/Частично/);
     assert.match($('queue').textContent,/не декодируются/);
     $('dataset').value='pages';$('dataset').dispatchEvent(new window.Event('change'));
@@ -81,6 +85,16 @@ test('DOM integration: demo → preview → filters → CSV download; failed GSF
     $('download').click();await wait(()=>downloads.length===2);
     assert.match(await downloads[1].blob.text(),/unsupported_binary_payload/);
     assert.match(downloads[1].name,/_pages\.csv$/);
+    $('clear').click();
+    $('dataset').value='positions';$('dataset').dispatchEvent(new window.Event('change'));
+    inputFiles([new File([indexedFixture()],'Materials.gsdx')]);$('convert').click();
+    await wait(()=>$('table-body').textContent.includes('TEST-001'));
+    assert.equal($('dataset').value,'records');assert.equal($('table-body').children.length,2);
+    assert.match($('table-body').textContent,/truck 10/);
+    assert.match($('queue').textContent,/2 записей/);
+    $('download').click();await wait(()=>downloads.length===3);
+    assert.match(downloads[2].name,/_records\.csv$/);
+    assert.match(await downloads[2].blob.text(),/truck 10/);
     $('clear').click();
     inputFiles([new File(['binary'],'<img data-xss="1">.gsfx')]);
     assert.equal(document.querySelector('[data-xss]'),null);

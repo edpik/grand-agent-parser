@@ -222,6 +222,10 @@ const GSDX_COMMON = [['file', 'Файл'], ['folders', 'Папки катало�
 const GSDX_PROVENANCE = [['path', 'Путь в источнике'], ['numericStatus', 'Извлечение числовых данных'],
   ['approved', 'Допущено к расчётам'], ['sourceHash', 'SHA-256 файла']];
 export const DATASET_COLUMNS = {
+  records: [['file', 'Файл'], ['rowIndex', 'ID записи (с нуля)'], ['code', 'Код из индекса'],
+    ['searchText', 'Поисковые слова по порядку'], ['tokenCount', 'Слов в индексе'], ['tokenGaps', 'Пропущенных позиций слов'],
+    ['indexStatus', 'Состав данных'], ['searchBlock', 'Блок поискового индекса'],
+    ['rowOffset', 'Смещение DocRows в файле'], ['rowBytes', 'Байт записи DocRows'], ...GSDX_PROVENANCE],
   catalog: [...GSDX_COMMON, ['articleAvailable', 'Техническая часть доступна'], ...GSDX_PROVENANCE],
   pages: [...GSDX_COMMON, ['page', 'Страница'], ['text', 'Текст'], ['encoding', 'Кодировка страницы'],
     ['block', 'Блок'], ['decodedOffset', 'Смещение в распакованном блоке'], ['decodedLength', 'Байт HTML'],
