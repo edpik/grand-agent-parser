@@ -1,3 +1,7 @@
+# Запуск на macOS
+
+Для MacBook Air M4 используйте [DMG для Apple Silicon из релиза v0.5.0](https://github.com/edpik/grand-agent-parser/releases/tag/v0.5.0). Перенесите Grand CSV в папку «Программы». Python и Node.js для установленного приложения не нужны. Ограничения GSDX сохраняются. [Пошаговая инструкция, включая первый запуск macOS](DESKTOP.md).
+
 # Запуск на MacBook Air M4
 
 Для преобразования смет в CSV можно сразу открыть веб-интерфейс: https://grand-csv-converter.ed-pik.chatgpt.site. Для него установка Python не нужна. Поддерживаются открытые GSFX/XML и частичный экспорт GSDX (каталог, структура, технические тексты); старый двоичный GSF требует предварительного XML-экспорта.

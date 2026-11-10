@@ -1,0 +1,95 @@
+{
+  "name": "grand-agent-desktop",
+  "version": "0.5.0",
+  "private": true,
+  "description": "Автономный конвертер файлов ГРАНД-Сметы в CSV с явными ограничениями GSDX",
+  "author": "edpik",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/*.test.cjs",
+    "test:smoke": "node tests/smoke.mjs",
+    "pack": "electron-builder --dir --publish never",
+    "dist": "electron-builder --publish never",
+    "install:runtime": "install-electron"
+  },
+  "devDependencies": {
+    "electron": "45.2.3",
+    "electron-builder": "26.18.0",
+    "playwright": "1.65.0"
+  },
+  "build": {
+    "appId": "ru.edpik.grandagentparser",
+    "productName": "Grand CSV",
+    "artifactName": "Grand-CSV-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "release",
+      "buildResources": "assets"
+    },
+    "files": [
+      "main.cjs",
+      "security.cjs",
+      "package.json",
+      "assets/icon.png"
+    ],
+    "extraResources": [
+      {
+        "from": "../web/dist",
+        "to": "ui",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../DESKTOP.md",
+        "to": "README-RU.md"
+      }
+    ],
+    "asar": true,
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.productivity",
+      "identity": "-",
+      "icon": "assets/icon.png",
+      "hardenedRuntime": false
+    },
+    "dmg": {
+      "title": "Grand CSV ${version}"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/icon.png",
+      "signAndEditExecutable": true,
+      "executableName": "GrandCSV"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Grand CSV",
+      "deleteAppDataOnUninstall": true,
+      "language": "1049",
+      "runAfterFinish": false
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "assets/icon.png",
+      "category": "Utility",
+      "executableName": "GrandCSV"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/edpik/grand-agent-parser.git",
+    "directory": "desktop"
+  }
+}

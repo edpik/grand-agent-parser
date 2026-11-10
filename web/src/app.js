@@ -99,7 +99,7 @@ function renderResult() {
   const start = page * PAGE_SIZE;
   for (const row of view.rows.slice(start, start + PAGE_SIZE)) {
     const tr = el('tr');
-    for (const [key] of display) { const value = String(row[key] ?? ''); const td = el('td', ['name', 'value', 'text', 'searchText'].includes(key) ? 'wide-cell' : '', value || '—'); td.title = value; tr.append(td); }
+    for (const [key] of display) { const value = String(row[key] ?? ''); const td = el('td', ['name', 'value', 'text', 'searchText'].includes(key) ? 'wide-cell' : ''); if (['text', 'searchText'].includes(key)) td.append(el('div', 'cell-preview', value || '—')); else td.textContent = value || '—'; td.title = value; tr.append(td); }
     ui['table-body'].append(tr);
   }
   ui['page-info'].textContent = `Строки ${count(start + 1)}–${count(Math.min(start + PAGE_SIZE, view.rows.length))} из ${count(view.rows.length)}. CSV содержит все отфильтрованные строки.`;
@@ -199,3 +199,9 @@ ui.download.addEventListener('click', async () => {
 });
 
 renderQueue(); renderResult();
+
+// Desktop uses the same converter and real Worker, with local application wording.
+if (navigator.userAgent.includes('Electron/')) {
+  document.title = 'Grand CSV — автономный конвертер';
+  document.getElementById('intro-copy').textContent = 'Загрузите документ, проверьте данные и сохраните CSV. Обработка выполняется на этом компьютере, без интернета.';
+}

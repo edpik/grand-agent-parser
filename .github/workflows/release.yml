@@ -1,60 +1,57 @@
-name: Publish parser release
+name: Publish desktop and parser release
 
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag
+        description: Version tag to publish after all installer checks pass
         required: true
-        default: v0.4.0
+        default: v0.5.0
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
+  source:
     runs-on: ubuntu-latest
     env:
       RELEASE_TAG: ${{ inputs.tag }}
-      GH_TOKEN: ${{ github.token }}
-      GH_REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Test the tagged source
-        run: python -m unittest discover -s tests -v
       - uses: actions/setup-node@v4
-        if: hashFiles('web/package-lock.json') != ''
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - name: Test and build browser converter
-        if: hashFiles('web/package-lock.json') != ''
+      - name: Check release versions
+        run: python tools/check_release.py "$RELEASE_TAG"
+      - name: Test parser and converters
         run: |
+          python -m unittest discover -s tests -v
           npm ci --prefix web --no-audit --no-fund
           npm test --prefix web
+          npm test --prefix desktop
           npm run build --prefix web
-      - name: Package and publish ZIP
+      - name: Package source and ready browser build
         shell: bash
         run: |
           set -euo pipefail
-          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}"
+          if git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"; then
+            test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$(git rev-parse HEAD)"
+          fi
           ASSET_NAME="grand_agent_parser_${RELEASE_TAG#v}.zip"
           PACKAGE_ROOT="$RUNNER_TEMP/parser-package/grand_agent_parser"
-          mkdir -p "$PACKAGE_ROOT"
-          git archive --format=tar "$RELEASE_TAG" | tar -xf - -C "$PACKAGE_ROOT"
-          if [[ -d web/dist ]]; then
-            cp -R web/dist "$PACKAGE_ROOT/web/dist"
-          fi
-          python - "$PACKAGE_ROOT" "$ASSET_NAME" <<'PY'
+          mkdir -p "$PACKAGE_ROOT" release
+          git archive --format=tar HEAD | tar -xf - -C "$PACKAGE_ROOT"
+          cp -R web/dist "$PACKAGE_ROOT/web/dist"
+          python - "$PACKAGE_ROOT" "release/$ASSET_NAME" <<'PY'
           from pathlib import Path
           import sys, zipfile
           root = Path(sys.argv[1])
@@ -62,13 +59,137 @@ jobs:
               for item in sorted(root.rglob('*')):
                   if item.is_file():
                       archive.write(item, 'grand_agent_parser/' + str(item.relative_to(root)))
+          with zipfile.ZipFile(sys.argv[2]) as archive:
+              assert archive.testzip() is None
           PY
-          python -c 'import sys, zipfile; assert zipfile.ZipFile(sys.argv[1]).testzip() is None' "$ASSET_NAME"
-          cp CHANGELOG.md "$RUNNER_TEMP/release-notes.md"
-          printf '\n\nSHA-256 ZIP:\n```text\n' >> "$RUNNER_TEMP/release-notes.md"
-          sha256sum "$ASSET_NAME" >> "$RUNNER_TEMP/release-notes.md"
-          printf '```\n' >> "$RUNNER_TEMP/release-notes.md"
-          gh release create "$RELEASE_TAG" "$ASSET_NAME" --verify-tag \
-            --title "$RELEASE_TAG — парсер и веб-конвертер CSV" \
-            --notes-file "$RUNNER_TEMP/release-notes.md"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-source
+          path: release/*.zip
+          if-no-files-found: error
+
+  desktop:
+    needs: source
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2022
+            platform: win
+            arch: x64
+          - runner: macos-15
+            platform: mac
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            desktop/package-lock.json
+      - name: Install build tools and build UI
+        run: |
+          npm ci --prefix web --no-audit --no-fund
+          npm ci --prefix desktop --no-audit --no-fund
+          npm run build --prefix web
+          npm test --prefix desktop
+      - name: Build installer
+        run: npm run dist --prefix desktop -- --${{ matrix.platform }} --${{ matrix.arch }}
+      - name: Install Windows package for verification
+        if: matrix.platform == 'win'
+        shell: pwsh
+        run: |
+          $installer = (Get-ChildItem desktop/release/Grand-CSV-*-win-x64.exe | Select-Object -First 1).FullName
+          $target = Join-Path $env:RUNNER_TEMP 'GrandCSVInstalled'
+          $result = Start-Process -FilePath $installer -ArgumentList '/S', "/D=$target" -Wait -PassThru
+          if ($result.ExitCode -ne 0) { throw "Installer failed with exit code $($result.ExitCode)" }
+          $binary = Join-Path $target 'GrandCSV.exe'
+          if (!(Test-Path $binary)) { throw "Installed executable is missing: $binary" }
+          "ELECTRON_APP_BINARY=$binary" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Install macOS app from DMG for verification
+        if: matrix.platform == 'mac'
+        shell: bash
+        run: |
+          set -euo pipefail
+          DMG=$(find desktop/release -maxdepth 1 -name '*.dmg' -print -quit)
+          MOUNT="$RUNNER_TEMP/grand-csv-dmg"
+          DEST="$RUNNER_TEMP/GrandCSVInstalled"
+          mkdir -p "$MOUNT" "$DEST"
+          hdiutil attach -readonly -nobrowse -mountpoint "$MOUNT" "$DMG"
+          ditto "$MOUNT/Grand CSV.app" "$DEST/Grand CSV.app"
+          hdiutil detach "$MOUNT"
+          codesign --verify --deep --strict "$DEST/Grand CSV.app"
+          echo "ELECTRON_APP_BINARY=$DEST/Grand CSV.app/Contents/MacOS/Grand CSV" >> "$GITHUB_ENV"
+      - name: Test the installed app with a real Worker and CSV download
+        env:
+          SMOKE_OUTPUT: ${{ runner.temp }}/grand-csv-smoke
+        run: npm run test:smoke --prefix desktop
+      - name: Prepare verification report
+        shell: bash
+        env:
+          SMOKE_RESULT: ${{ runner.temp }}/grand-csv-smoke/result.json
+          QA_NAME: qa-${{ matrix.platform }}-${{ matrix.arch }}.json
+        run: node -e "require('fs').copyFileSync(process.env.SMOKE_RESULT, 'desktop/release/' + process.env.QA_NAME)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            desktop/release/Grand-CSV-*.exe
+            desktop/release/*.dmg
+            desktop/release/qa-*.json
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: desktop-qa-${{ matrix.platform }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/grand-csv-smoke/
+          if-no-files-found: ignore
+
+  publish:
+    needs: [source, desktop]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release
+          merge-multiple: true
+      - name: Check artifacts and publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          root = Path('release')
+          version = os.environ['RELEASE_TAG'].removeprefix('v')
+          for name in [f'Grand-CSV-{version}-win-x64.exe', f'Grand-CSV-{version}-mac-arm64.dmg', f'grand_agent_parser_{version}.zip']:
+              assert (root/name).stat().st_size > 1000, name
+          for name, platform, arch in [('qa-win-x64.json','win32','x64'),('qa-mac-arm64.json','darwin','arm64')]:
+              qa = json.loads((root/name).read_text())
+              assert qa['packaged'] and qa['download'] == 'verified' and qa['errors'] == []
+              assert qa['version'] == version and qa['platform'] == platform and qa['arch'] == arch
+          files = sorted(root.iterdir())
+          (root/'SHA256SUMS.txt').write_text(''.join(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n' for p in files), encoding='utf-8')
+          PY
+          gh release create "$RELEASE_TAG" release/* --target "$GITHUB_SHA" \
+            --title "$RELEASE_TAG — приложение для Windows и Mac M1–M4" \
+            --notes-file DESKTOP_RELEASE_NOTES.md
           gh release view "$RELEASE_TAG" --json url --jq '.url' >> "$GITHUB_STEP_SUMMARY"

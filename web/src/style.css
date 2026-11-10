@@ -10,3 +10,6 @@
 @media(max-width:700px){.privacy-pill{font-size:0}.intro-copy{font-size:13px}.step-line{font-size:9px}.result-heading .button{font-size:11px}.settings-panel select{font-size:13px}.status-banner{font-size:11px}.table-footer{font-size:9px}.support-tag{font-size:9px}.footer{font-size:10px}}
 /* Keep secondary copy legible against the light background. */
 .intro-copy,.dropzone p,.dropzone small,.field-help,.check-label small,.compatibility-note,.file-meta,.file-warning,.result-heading p,.empty-result p,.table-tools>span,.table-footer,.how-cards p,details p,.footer{color:#6d7967}.field-label,.check-label{color:#53664e}.excel-note small{color:#6c7f60}.subtle-tag{color:#68795e}.step-line{color:#77846d}.support-tag{color:#567d3f}.conditional{color:#8a6e2c}
+
+/* Keep long indexed descriptions usable in the CSV preview; export remains complete. */
+td{vertical-align:top}.cell-preview{display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-line;max-height:9.6em}

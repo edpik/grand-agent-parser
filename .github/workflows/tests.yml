@@ -36,3 +36,5 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm test
       - run: npm run build
+      - run: npm test --prefix ../desktop
+      - run: node --check ../desktop/main.cjs

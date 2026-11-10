@@ -21,3 +21,6 @@ parsed*/
 .env.*
 !.env.example
 
+
+/desktop/release/
+/desktop/smoke*/
